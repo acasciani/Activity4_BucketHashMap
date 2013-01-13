@@ -14,15 +14,18 @@ public class Driver {
 		@Override
 		public void run() {
 			for(int i = 1; i <= 5; i++) {
-				map.put(name + i, name + " " + i);
+				map.put(name + i, name + " value: " + i);
 			}
 		}
 	}
 	
 	private class TaskSize implements Runnable {
+		
 		@Override
 		public void run() {
-			System.out.printf("The size of the map is %s", map.size());
+			for ( int i = 0; i < 5 ; i++){
+				System.out.printf("The size of the map is %s%n", map.size());
+			}
 		}
 	}
 
@@ -34,10 +37,11 @@ public class Driver {
 		Thread task3 = new Thread(driver.new Task("Tested"));
 		Thread sizeTask = new Thread(driver.new TaskSize());
 		
+		sizeTask.start();
 		task1.start();
 		task2.start();
 		task3.start();
-		sizeTask.start();
+		
 	}
 
 	

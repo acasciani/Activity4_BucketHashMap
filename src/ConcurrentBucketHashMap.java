@@ -51,72 +51,72 @@ public class ConcurrentBucketHashMap<K, V> {
         private final List<Pair<K, V>> contents =
                 new ArrayList<Pair<K, V>>() ;
         private final ReadWriteLock rwl = new ReentrantReadWriteLock();
+        private final Lock r = rwl.readLock();
+        private final Lock w = rwl.writeLock();
 
+        /*
+         * Acquire a read lock.
+         */
+        void lockRead() {
+        	r.lock();
+        }
+        
+        /*
+         * Let go of a read lock.
+         */
+        void unlockRead() {
+        	r.unlock();
+        }
+        
+        /*
+         * Acquire a write lock.
+         */
+        void lockWrite() {
+        	w.lock();
+        }
+        
+        /*
+         * Let go of a write lock.
+         */
+        void unlockWrite() {
+        	w.unlock();
+        }
+        
         /*
          * Return the current Bucket size.
          */
         int size() {
-        	rwl.readLock().lock();
-        	
-        	try {
-                return contents.size() ;
-        	} finally {
-        		rwl.readLock().unlock();
-        	}
+        	return contents.size() ;
         }
 
         /*
          * Get the Pair at location 'i' in the Bucket.
          */
         Pair<K, V> getPair(int i) {
-        	rwl.readLock().lock();
-        	
-        	try {
-                return contents.get(i) ;
-        	} finally {
-        		rwl.readLock().unlock();
-        	}
+        	return contents.get(i) ;
         }
 
         /*
          * Replace the Pair at location 'i' in the Bucket.
          */
         void putPair(int i, Pair<K, V> pair) {
-        	rwl.writeLock().lock();
-        	
-        	try {
-                contents.set(i, pair) ;
-        	} finally {
-        		rwl.writeLock().unlock();
-        	}
+            contents.set(i, pair) ;
         }
 
         /*
          * Add a Pair to the Bucket.
          */
         void addPair(Pair<K, V> pair) {
-        	rwl.writeLock().lock();
-        	
-        	try {
-        		contents.add(pair) ;
-        	} finally {
-        		rwl.writeLock().unlock();
-        	}
+        	contents.add(pair) ;
+
         }
 
         /*
          * Remove a Pair from the Bucket by position.
          */
         void removePair(int index) {
-        	rwl.writeLock().lock();
-        	
-        	try {
-                contents.remove(index) ;
-        	} finally {
-        		rwl.writeLock().unlock();
-        	}
+            contents.remove(index) ;
         }
-        
         
     }
 
@@ -139,8 +139,13 @@ public class ConcurrentBucketHashMap<K, V> {
     public boolean containsKey(K key) {
         Bucket<K, V> theBucket = buckets.get(bucketIndex(key)) ;
         boolean      contains ;
-
-        contains = findPairByKey(key, theBucket) >= 0 ;
+        
+        theBucket.lockRead();
+        try {
+        	contains = findPairByKey(key, theBucket) >= 0 ;
+        } finally {
+        	theBucket.unlockRead();
+        }
         
         return contains ;
     }
@@ -153,19 +158,17 @@ public class ConcurrentBucketHashMap<K, V> {
 
         for( int i = 0 ; i < numberOfBuckets ; i++ ) {
         	Bucket<K, V> theBucket = buckets.get(i) ;
-        	theBucket.rwl.readLock().lock();
+        	theBucket.lockRead();
         }
         
-        try {
-            for ( int i = 0 ; i < numberOfBuckets ; i++ ) {
-                Bucket<K, V> theBucket =  buckets.get(i) ;
-                size += theBucket.size() ;
-            }
-        } finally {
-            for( int i = 0 ; i < numberOfBuckets ; i++ ) {
-            	Bucket<K, V> theBucket = buckets.get(i) ;
-            	theBucket.rwl.readLock().unlock();
-            }
+
+        for ( int i = 0 ; i < numberOfBuckets ; i++ ) {
+        	Bucket<K, V> theBucket =  buckets.get(i) ;
+        	try{
+        		size += theBucket.size() ;
+        	} finally {
+        		theBucket.unlockRead();
+        	}
         }
 
         return size ;
@@ -179,10 +182,15 @@ public class ConcurrentBucketHashMap<K, V> {
         Bucket<K, V> theBucket = buckets.get(bucketIndex(key)) ;
         Pair<K, V>   pair      = null ;
 
-        int index = findPairByKey(key, theBucket) ;
+        theBucket.lockRead();
+        try{
+        	int index = findPairByKey(key, theBucket) ;
 
-        if ( index >= 0 ) {
-            pair = theBucket.getPair(index) ;
+        	if ( index >= 0 ) {
+        		pair = theBucket.getPair(index) ;
+        	}
+        } finally {
+        	theBucket.unlockRead();
         }
 
         return (pair == null) ? null : pair.value ;
@@ -198,18 +206,25 @@ public class ConcurrentBucketHashMap<K, V> {
         Pair<K, V>   newPair   = new Pair<K, V>(key, value) ;
         V            oldValue ;
 
-        int index = findPairByKey(key, theBucket) ;
+        theBucket.lockWrite();
         
-        if ( index >= 0 ) {
-        	Pair<K, V> pair = theBucket.getPair(index) ;
-        	
-        	theBucket.putPair(index, newPair) ;
-        	oldValue = pair.value ;
-        	
-        } else {
-        	theBucket.addPair(newPair) ;
-        	oldValue = null ;
+        try{
+		    int index = findPairByKey(key, theBucket) ;
+		    
+		    if ( index >= 0 ) {
+		    	Pair<K, V> pair = theBucket.getPair(index) ;
+		    	
+		    	theBucket.putPair(index, newPair) ;
+		    	oldValue = pair.value ;
+		    	
+		    } else {
+		    	theBucket.addPair(newPair) ;
+		    	oldValue = null ;
+		    }
+        } finally {
+        	theBucket.unlockWrite();
         }
+        
         return oldValue ;
     }
 
@@ -222,14 +237,21 @@ public class ConcurrentBucketHashMap<K, V> {
         Bucket<K, V> theBucket = buckets.get(bucketIndex(key)) ;
         V removedValue = null ;
         
-        int index = findPairByKey(key, theBucket) ;
+        theBucket.lockWrite();
         
-        if ( index >= 0 ) {
-        	Pair<K, V> pair = theBucket.getPair(index) ;
-        	
-        	theBucket.removePair(index) ;
-        	removedValue = pair.value ;
+        try{
+	        int index = findPairByKey(key, theBucket) ;
+	        
+	        if ( index >= 0 ) {
+	        	Pair<K, V> pair = theBucket.getPair(index) ;
+	        	
+	        	theBucket.removePair(index) ;
+	        	removedValue = pair.value ;
+	        }
+        } finally {
+        	theBucket.unlockWrite();
         }
+	        
         return removedValue ;
     }
 
