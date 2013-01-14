@@ -16,7 +16,7 @@ import java.util.concurrent.locks.* ;
  * In this version, all synchronization is done using built-in
  * Java synchronized blocks. This is inefficient, as it does not
  * support concurrent reading, and does not allow a consistent
- * compoutation of the size.
+ * computation of the size.
  */
 
 public class ConcurrentBucketHashMap<K, V> {
@@ -62,7 +62,7 @@ public class ConcurrentBucketHashMap<K, V> {
         }
         
         /*
-         * Let go of a read lock.
+         * Release a read lock.
          */
         void unlockRead() {
         	r.unlock();
@@ -76,7 +76,7 @@ public class ConcurrentBucketHashMap<K, V> {
         }
         
         /*
-         * Let go of a write lock.
+         * Release a write lock.
          */
         void unlockWrite() {
         	w.unlock();
