@@ -40,12 +40,16 @@ public class Driver {
 				// Randomly sleep.
 				if ( random.nextBoolean() ) {
 					try{
-						Thread.sleep(1000);
+						Thread.sleep(500);
 					} catch ( InterruptedException ie ) {
 						System.err.println( "Error: " + ie.getMessage() );
 					}
 				}
 				
+				// Randomly remove the element we just put in.
+				if ( random.nextBoolean() ){
+					map.remove(name + i);
+				}
 			}
 		}
 	}
@@ -53,6 +57,10 @@ public class Driver {
 	private class SizeTask implements Runnable {
 		private boolean killed;
 		
+		/** kill()
+		 * 
+		 * Kills the SizeTask thread.
+		 */
 		public void kill(){
 			killed = true;
 		}
@@ -74,12 +82,14 @@ public class Driver {
 	public static void main(String[] args) {
 		Driver driver = new Driver();
 		
+		// Create our threads.
 		SizeTask sz = driver.new SizeTask();
 		Thread task1 = new Thread( driver.new Task( "Test" ) );
 		Thread task2 = new Thread( driver.new Task( "Testable" ) );
 		Thread task3 = new Thread( driver.new Task( "Tested" ) );
 		Thread sizeTask = new Thread( sz );
 		
+		// Start our threads.
 		sizeTask.start();
 		task1.start();
 		task2.start();
@@ -91,6 +101,7 @@ public class Driver {
 			System.err.println( "Error: " + ie.getMessage() );
 		}
 		
+		// Kill the SizeTask thread.
 		sz.kill();
 	}
 
